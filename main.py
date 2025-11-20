@@ -68,7 +68,7 @@ for day, group in septemberDays:
 
 for day, group in octoberDays:
     group = group.sort_values('timeStart')
-    dovsax.step(group['timeStart'], group['price'], label=str(day), color='blue', alpha=0.75, where='post')
+    dovsax.step(group['timeStart'], group['price'], label=str(day), color='blue', alpha=0.5, where='post')
 
 
 
@@ -172,7 +172,7 @@ for day, group in septemberDayR:
 
 for day, group in octoberDayR:
     group = group.sort_values('timeStart')
-    drovsax.step(group['timeStart'], group['price'], label=str(day), color='blue', alpha=0.75, where='post')
+    drovsax.step(group['timeStart'], group['price'], label=str(day), color='blue', alpha=0.5, where='post')
 
 drovsax.set_title("DAM Price over day RESAMPLED to 60min")
 drovsax.set_xlabel('Delivery Start')
@@ -182,8 +182,8 @@ drovsax.xaxis.set_major_locator(mticker.MultipleLocator(1))
 drovsax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{int(x):02d}:00"))
 drovsax.tick_params(axis='x', rotation=90)
 legend_elements = [
-    Line2D([0], [0], color='blue', lw=2, label='September (60min period)'),
-    Line2D([0], [0], color='orange', lw=2, label='October (60min period)')
+    Line2D([0], [0], color='blue', lw=2, label='October (60min period)'),
+    Line2D([0], [0], color='orange', lw=2, label='September(60min period)')
 ]
 plt.legend(handles=legend_elements)
 plt.tight_layout()
