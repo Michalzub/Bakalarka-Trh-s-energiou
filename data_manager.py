@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pandas as pd
-import data_access_module as da
 
 OKTE_FLOW_COLS = ["flowSkCz", "flowCzSk", "flowSkPl", "flowPlSk", "flowSkPlc", "flowPlcSk", "flowSkHu", "flowHuSk",
              "flowHuRo", "flowRoHu"]
