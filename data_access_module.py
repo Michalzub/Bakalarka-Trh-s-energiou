@@ -87,6 +87,7 @@ def get_okte_data_simple(marketType: str, startDate: datetime, endDate: datetime
     if marketType not in MARKET_URLS:
         raise ValueError("marketType doesnt exist")
 
+
     months = months_between(startDate, endDate)
 
     frames = []
@@ -107,15 +108,17 @@ def get_okte_data_simple(marketType: str, startDate: datetime, endDate: datetime
     final = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     if not final.empty:
-        convert_to_datetime(final, ["deliveryStart"])
-        startDate = pd.Timestamp(startDate, tz="UTC")
-        endDate = pd.Timestamp(endDate, tz="UTC")
+        convert_to_datetime(final, ["deliveryStart"]) #CONVERT JE Z INEHO MODULU MOZE BYT????
+        startDate = pd.Timestamp(startDate).tz_localize("Europe/Bratislava")
+        endDate = pd.Timestamp(endDate).tz_localize("Europe/Bratislava")
         final = final[
             (final["deliveryStart"] >= startDate) &
             (final["deliveryStart"] <= endDate)
             ]
-
-    return final
+        final = final.rename(columns={"priceWeightedAverage": "price"})
+        return final
+    else:
+        raise ValueError("No data found")
 
 def get_entsoe_data(startDate: datetime, endDate: datetime, country_code: str, apiKey: str):
     check_valid_date_range(startDate, endDate)

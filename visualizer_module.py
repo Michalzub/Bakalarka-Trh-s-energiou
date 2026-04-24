@@ -6,8 +6,22 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import seaborn as sns
 from ridgeplot import ridgeplot
+import numpy as np
 
 #NEED TO MAKE DOMAIN SPECIFIC FUNCTIONS
+
+def add_dev_scatter(axis, title, data):
+    axis.plot([-50, 400], [-50, 400], color='red', linestyle='--', linewidth=1, label='x=y')
+    axis.plot([-50, 400], [-0, 450], color='gray', linestyle='--', linewidth=1, label='x=y')
+    axis.plot([0, 400], [-50, 350], color='gray', linestyle='--', linewidth=1, label='x=y')
+    axis.scatter(data['DAM_price'], data['IDM_price'], alpha=0.5)
+    axis.set_title(title)
+    axis.set_xlabel("DAM Price (€/MWh)")
+    axis.set_ylabel("IDM Price (€/MWh)")
+    axis.set_xlim(-50, 400)
+    axis.set_ylim(-50, 400)
+    axis.grid(True)
+
 
 def plot_scatter(
         df: pd.DataFrame,
@@ -32,7 +46,6 @@ def plot_scatter(
     ax.set_ylabel(yname)
     ax.set_xlim(limits)
     ax.set_ylim(limits)
-    # default was -50, 400
     ax.grid(True)
     ax.plot(limits, limits, linestyle="--", color="gray")
     plt.close(fig)
@@ -71,9 +84,9 @@ def plot_line(
     return fig, ax
 
 def plot_dam_idm_line(df: pd.DataFrame) -> Figure:
-    fig, ax = plot_line(df, "deliveryStartBA", "DAM_price", "DAM price over 10.2025", "", "Price (€/MWh)",
+    fig, ax = plot_line(df, "deliveryStart", "DAM_price", "DAM price over 10.2025", "", "Price (€/MWh)",
                             label="DAM15")
-    plot_line(df, "deliveryStartBA", "IDM_price", "IDM price over 10.2025", "", "Price (€/MWh)",
+    plot_line(df, "deliveryStart", "IDM_price", "IDM price over 10.2025", "", "Price (€/MWh)",
                   ax=ax, label="DAM15")
     ax.legend()
     return fig
@@ -109,7 +122,7 @@ def plot_dam_idm_spread_box(
 ):
     fig = plot_box(
         df,
-        x='hourBA',
+        x='hour',
         y='dam_idm_spread',
         title="Deviation per hour of day October 2025",
         xname='Hour of Day (Europe/Bratislava)',
@@ -127,10 +140,10 @@ def plot_violin_quarterly_price(
     for i, hour in enumerate(range(24)):
         ax = axes[i]
 
-        subset = df[df['hourBA'] == hour]
+        subset = df[df['hour'] == hour]
         sns.violinplot(
             data=subset,
-            x='quarterHourBA',
+            x='quarterHour',
             y='price',
             hue='market',
             split=True,
@@ -162,10 +175,10 @@ def plot_ridge_hourly(
     if xname is None:
         xname = value_col
 
-    hours = sorted(df['hourBA'].unique())
+    hours = sorted(df['hour'].unique())
 
     samples = [
-        df.loc[df['hourBA'] == h, value_col].dropna().values
+        df.loc[df['hour'] == h, value_col].dropna().values
         for h in hours
     ]
 
@@ -222,3 +235,75 @@ def plot_hist(
     ax.set_ylabel(yname)
     plt.close(fig)
     return fig
+
+def plot_battery_dp_result(result):
+    df = result["df"]
+    soc_path = result["soc_path"]
+    action_points = result["action_points"]
+    profit = result["profit"]
+    unit_size = result["unit_size"]
+    max_soc_units = result["max_soc_units"]
+    prices = df['price']
+
+    fig, ax1 = plt.subplots(figsize=(18, 7))
+
+    ax1.plot(
+        prices,
+        color="royalblue",
+        label="Cena elektriny (€/MWh)",
+        linewidth=2,
+        alpha=0.7
+    )
+
+    for t, price, action_type in action_points:
+        if action_type == "charge":
+            ax1.scatter(t, price, color="green", marker="^", s=120, zorder=5)
+        else:
+            ax1.scatter(t, price, color="red", marker="v", s=120, zorder=5)
+
+    ax1.scatter([], [], color="green", marker="^", s=120, label="Nákup (Charge)")
+    ax1.scatter([], [], color="red", marker="v", s=120, label="Predaj (Discharge)")
+
+    ax1.set_xlabel("Perióda (15-min intervaly)")
+    ax1.set_ylabel("Cena (€/MWh)")
+    ax1.grid(True, alpha=0.3)
+
+    ax2 = ax1.twinx()
+    ax2.step(
+        range(len(soc_path)),
+        np.array(soc_path) * unit_size,
+        where="post",
+        color="orange",
+        alpha=0.5,
+        label="SoC (MWh)"
+    )
+    ax2.set_ylabel("Stav nabitia (MWh)")
+    ax2.set_ylim(0, (max_soc_units * unit_size) + 0.5)
+
+    handles1, labels1 = ax1.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(handles1 + handles2, labels1 + labels2, loc="upper left", frameon=True, shadow=True)
+
+    for i in range(0, len(prices) + 1, 4):
+        ax1.axvline(x=i, linestyle="--", color="gray", alpha=0.2)
+
+    plt.title(f"DP Analýza: (Zisk: {profit:.2f} €)")
+    return fig
+
+def battery_output_dataframe(result):
+    rows = []
+
+    df = result["df"]
+    soc_path = result["soc_path"]
+    unit_size = result["unit_size"]
+
+    for t, _, action in result["action_points"]:
+        rows.append({
+            "deliveryStart": df.loc[t, "deliveryStart"],
+            "price": df.loc[t, "price"],
+            "action": action,
+            "soc_units": soc_path[t + 1],  # aligned with your previous logic
+            "soc_mwh": soc_path[t + 1] * unit_size
+        })
+
+    return pd.DataFrame(rows)
