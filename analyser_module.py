@@ -11,24 +11,24 @@ def calculate_corr(df: pd.DataFrame, col1: str, df2: pd.DataFrame, col2: str):
 
     return s1.corr(s2)
 
-def price_summary_statistics(data):
+def price_summary_statistics(df: pd.DataFrame):
 
-    prices = data['price'].dropna()
+    prices = df['price'].dropna()
 
     mean_val = prices.mean()
     std_val = prices.std()
 
     stats = {
-        "count": len(prices),
-        "Mean": mean_val,
-        "Median": prices.median(),
-        "Max": prices.max(),
-        "Min": prices.min(),
-        "Range": prices.max() - prices.min(),
-        "Std": std_val,
-        "Coef_of_Var": std_val / mean_val,
-        "Skewness": skew(prices),
-        "Kurtosis": kurtosis(prices, fisher=False),
+        "Počet": len(prices),
+        "Priemer": mean_val,
+        "Medián": prices.median(),
+        "Maximum": prices.max(),
+        "Minimum": prices.min(),
+        "Rozsah": prices.max() - prices.min(),
+        "Štandardná odchýlka": std_val,
+        "Koeficient variability": std_val / mean_val,
+        "Šikmosť": skew(prices),
+        "Špicatosť": kurtosis(prices, fisher=False),
     }
 
     return stats
@@ -36,20 +36,16 @@ def price_summary_statistics(data):
 def calculate_quantiles(data, column:str):
     prices = data[column].dropna()
     quantiles = {
-        "95 quantile": prices.quantile(0.95),
-        "75 quantile": prices.quantile(0.75),
-        "25 quantile": prices.quantile(0.25),
-        "05 quantile": prices.quantile(0.05),
+        "0.95 kvantil": prices.quantile(0.95),
+        "0.75 kvantil": prices.quantile(0.75),
+        "0.25 kvantil": prices.quantile(0.25),
+        "0.05 kvantil": prices.quantile(0.05),
     }
     return quantiles
 
-def calculate_price_diff(data):
-    data['price_diff'] = data['price'].diff()
-    df = data.dropna(subset=['price_diff'])
-    return df
 
-def price_diff_summary_statistics(data):
-    r = data['price_diff'].dropna()
+def price_diff_summary_statistics(df: pd.DataFrame):
+    r = df['price_diff'].dropna()
     return {
         "mean price diff": r.mean(),
         "std price diff": r.std(),
@@ -62,56 +58,73 @@ def price_diff_summary_statistics(data):
 
     }
 
+def avg_daily_max_spread_by_weekday(df: pd.DataFrame):
+    df = df.copy()
 
-def weekday_statistics(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    daily_spread = (
+        df.groupby('deliveryDay')['price']
+        .agg(lambda x: x.max() - x.min())
+        .rename('spread')
+    )
 
-    df = df.groupby('weekday')[value_col]
-    return df
+    weekday_map = (
+        df.drop_duplicates('deliveryDay')
+        .set_index('deliveryDay')['weekday']
+    )
 
-def calculate_intermarket_spread(df: pd.DataFrame):
-    required_cols = {"DAM_price", "IDM_price"}
+    daily_spread = daily_spread.to_frame().join(weekday_map)
 
-    if not required_cols.issubset(df.columns):
-        raise ValueError(f"Missing required columns: {required_cols}")
+    result = (
+        daily_spread.groupby('weekday')['spread']
+        .mean()
+        .sort_index()
+    )
 
-    temp = df.copy()
-    temp['dam_idm_spread'] = df['DAM_price'] - df['IDM_price']
-    return temp
+    return result
 
-
-
-def calculate_battery_dp(df, max_soc_units=2, unit_size=0.5, efficiency=0.90, distribution_cost=0.00):
+def calculate_battery_arbitrage(
+        df: pd.DataFrame,
+        max_soc_units:int = 2,
+        unit_size:float = 0.5,
+        efficiency:float = 0.90,
+        distribution_cost:float = 0.00
+):
     df = df.reset_index(drop=True).copy()
     prices = df['price']
     periods = len(df['price'])
 
-    dp = np.full((periods + 1, max_soc_units + 1), -np.inf)
+    profits = np.full((periods + 1, max_soc_units + 1), -np.inf)
     parent = np.full((periods + 1, max_soc_units + 1), -1, dtype=int)
 
-    dp[0][0] = 0
+    profits[0][0] = 0
 
     for t in range(periods):
         for s in range(max_soc_units + 1):
-            if dp[t][s] == -np.inf:
+            if profits[t][s] == -np.inf:
+                continue
+
+            if np.isnan(prices[t]):
+                profits[t + 1][s] = profits[t][s]
+                parent[t + 1][s] = s
                 continue
 
             # IDLE
-            if dp[t][s] > dp[t + 1][s]:
-                dp[t + 1][s] = dp[t][s]
+            if profits[t][s] > profits[t + 1][s]:
+                profits[t + 1][s] = profits[t][s]
                 parent[t + 1][s] = s
 
             # CHARGE
             if s < max_soc_units:
                 cost = (prices[t] + distribution_cost) * unit_size
-                if dp[t][s] - cost > dp[t + 1][s + 1]:
-                    dp[t + 1][s + 1] = dp[t][s] - cost
+                if profits[t][s] - cost > profits[t + 1][s + 1]:
+                    profits[t + 1][s + 1] = profits[t][s] - cost
                     parent[t + 1][s + 1] = s
 
             # DISCHARGE
             if s > 0:
-                revenue = (prices[t] - distribution_cost) * unit_size * efficiency
-                if dp[t][s] + revenue > dp[t + 1][s - 1]:
-                    dp[t + 1][s - 1] = dp[t][s] + revenue
+                revenue = prices[t] * unit_size * efficiency
+                if profits[t][s] + revenue > profits[t + 1][s - 1]:
+                    profits[t + 1][s - 1] = profits[t][s] + revenue
                     parent[t + 1][s - 1] = s
 
     soc_path = []
@@ -123,7 +136,9 @@ def calculate_battery_dp(df, max_soc_units=2, unit_size=0.5, efficiency=0.90, di
     soc_path.reverse()
 
     action_points = []
-    for t, (curr, nxt) in enumerate(zip(soc_path[:-1], soc_path[1:])):
+    for t in range(periods):
+        curr = soc_path[t]
+        nxt = soc_path[t + 1]
         if nxt > curr:
             action_points.append((t, prices[t], "charge"))
         elif nxt < curr:
@@ -131,11 +146,28 @@ def calculate_battery_dp(df, max_soc_units=2, unit_size=0.5, efficiency=0.90, di
 
     return {
         "df": df,
-        "dp": dp,
-        "parent": parent,
         "soc_path": soc_path,
         "action_points": action_points,
-        "profit": dp[periods][0],
+        "profit": profits[periods][0],
         "unit_size": unit_size,
         "max_soc_units": max_soc_units,
     }
+
+def calculate_time_summary(df: pd.DataFrame, quarter:bool, column:str):
+    group_cols = ['hour', 'quarterHour'] if quarter else ['hour']
+    summary = (
+        df
+        .groupby(group_cols)[column]
+        .agg(
+            mean='mean',
+            median='median',
+            std='std',
+            min='min',
+            q25=lambda x: x.quantile(0.25),
+            q75=lambda x: x.quantile(0.75),
+            max='max'
+        )
+        .reset_index()
+    )
+
+    return summary

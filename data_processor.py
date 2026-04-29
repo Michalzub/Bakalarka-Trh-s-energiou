@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pandas as pd
 
 MAIN_DAM_COLS = ['price','purchaseSuccessfulVolume','saleSuccessfulVolume','deliveryDay','period','deliveryStart','deliveryEnd','market']
@@ -22,9 +20,11 @@ def change_timezone(df: pd.DataFrame, columns: list[str], timezone: str):
 
 
 def add_time_features(df: pd.DataFrame):
-    df['weekday'] = df['deliveryStart'].dt.dayofweek
-    df['quarterHour'] = df['deliveryStart'].dt.minute // 15
-    df['hour'] = df['deliveryStart'].dt.hour
+    temp= df.copy()
+    temp['weekday'] = temp['deliveryStart'].dt.dayofweek
+    temp['quarterHour'] = temp['deliveryStart'].dt.minute // 15
+    temp['hour'] = temp['deliveryStart'].dt.hour
+    return temp
 
 def prep_okte_data(df: pd.DataFrame) -> pd.DataFrame:
     temp = df.copy()
@@ -34,17 +34,8 @@ def prep_okte_data(df: pd.DataFrame) -> pd.DataFrame:
         temp = temp.loc[:,MAIN_IDM_COLS]
     convert_to_datetime(temp, ['deliveryStart', 'deliveryEnd']) #TEORETICKY DUPLIKATNE VOLANIE ALE NECHAM PRE ISTOTU
     change_timezone(temp,['deliveryStart', 'deliveryEnd'], timezone="Europe/Bratislava")
-    add_time_features(temp)
-    return temp
-
-def prep_entsoe_data(df: pd.DataFrame) -> pd.DataFrame:
-    temp = df.copy()
-    temp.rename(columns={
-        "Solar": "solar",
-        "Wind Onshore": "windOnshore",
-        "Wind Offshore": "windOffshore"
-    }, inplace=True)
-    temp['windTotal'] = temp['windOnshore'] + temp['windOffshore']
+    temp = add_time_features(temp)
+    temp = calculate_price_diff(temp)
     return temp
 
 def merge_dam_idm_prices(df_dam: pd.DataFrame, df_idm: pd.DataFrame) -> pd.DataFrame:
@@ -54,7 +45,6 @@ def merge_dam_idm_prices(df_dam: pd.DataFrame, df_idm: pd.DataFrame) -> pd.DataF
         on='deliveryStart',
         how='inner'
     )
-
     return temp
 
 def aggregate_hour(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
@@ -67,9 +57,51 @@ def aggregate_hour(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
     )
     return hourly
 
+def replicate_hour_to_quarter(df: pd.DataFrame) -> pd.DataFrame:
+    temp = df[['price', 'deliveryStart']].set_index('deliveryStart')
+    temp = temp.resample('15min').ffill()
+    temp = temp.reset_index()
+    return temp
 
-def concat_dam_idm(df_dam: pd.DataFrame, df_idm: pd.DataFrame) -> pd.DataFrame:
-    combined = pd.concat([df_dam, df_idm], ignore_index=True)
-    combined.drop(columns=['purchaseSuccessfulVolume','saleSuccessfulVolume',"successfulVolume"], inplace=True)
-    return combined
+def calculate_price_diff(df: pd.DataFrame):
+    temp = df.copy()
+    temp['price_diff'] = temp['price'].diff()
+    return temp
 
+def calculate_intermarket_spread(df: pd.DataFrame):
+    required_cols = {"DAM_price", "IDM_price"}
+
+    if not required_cols.issubset(df.columns):
+        raise ValueError(f"Missing required columns: {required_cols}")
+
+    temp = df.copy()
+    temp['spread'] = df['DAM_price'] - df['IDM_price']
+    return temp
+
+def remove_nonstandard_days(df: pd.DataFrame) -> pd.DataFrame:
+    max_periods = df.groupby("deliveryDay")["period"].max()
+    normal_period_count = max_periods.mode().iloc[0]
+
+    valid_days = max_periods[max_periods == normal_period_count].index
+
+    return df[df["deliveryDay"].isin(valid_days)].copy()
+
+def groupby_period_mean(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    temp = (
+        df
+        .groupby("period", as_index=False)[value_col]
+        .mean()
+        .sort_values("period")
+        .reset_index(drop=True)
+    )
+
+    return temp
+
+def groupby_weekday_mean(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    df = df.groupby('weekday')[value_col].mean()
+    return df
+
+def combine_datasets(df1, df2):
+    combined_df = pd.concat([df1, df2])
+    combined_df = combined_df.sort_index()
+    return combined_df

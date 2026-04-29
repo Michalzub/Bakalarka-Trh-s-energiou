@@ -1,242 +1,210 @@
-from typing import Any
-
 import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import seaborn as sns
-from ridgeplot import ridgeplot
 import numpy as np
-
-#NEED TO MAKE DOMAIN SPECIFIC FUNCTIONS
-
-def add_dev_scatter(axis, title, data):
-    axis.plot([-50, 400], [-50, 400], color='red', linestyle='--', linewidth=1, label='x=y')
-    axis.plot([-50, 400], [-0, 450], color='gray', linestyle='--', linewidth=1, label='x=y')
-    axis.plot([0, 400], [-50, 350], color='gray', linestyle='--', linewidth=1, label='x=y')
-    axis.scatter(data['DAM_price'], data['IDM_price'], alpha=0.5)
-    axis.set_title(title)
-    axis.set_xlabel("DAM Price (€/MWh)")
-    axis.set_ylabel("IDM Price (€/MWh)")
-    axis.set_xlim(-50, 400)
-    axis.set_ylim(-50, 400)
-    axis.grid(True)
-
-
-def plot_scatter(
-        df: pd.DataFrame,
-        x: str,
-        y: str,
-        title: str | None = None,
-        xname: str | None = None,
-        yname: str | None = None,
-        figsize: tuple[float,float] | None = (6, 6),
-        limits: tuple[float,float] | None = (-50, 400),
-
-) -> Figure:
-    if xname is None:
-        xname = x
-    if yname is None:
-        yname = y
-
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.scatter(df[x], df[y], alpha=0.5)
-    ax.set_title(title)
-    ax.set_xlabel(xname)
-    ax.set_ylabel(yname)
-    ax.set_xlim(limits)
-    ax.set_ylim(limits)
-    ax.grid(True)
-    ax.plot(limits, limits, linestyle="--", color="gray")
-    plt.close(fig)
-    return fig
-
-def plot_dam_idm_price_scatter(df: pd.DataFrame)-> Figure:
-    return plot_scatter(df, "DAM_price", "IDM_price", xname="DAM Price (€/MWh)", yname="IDM Price (€/MWh)")
 
 def plot_line(
         df: pd.DataFrame,
         x: str,
         y: str,
-        title: str | None = None,
-        xname: str | None = None,
-        yname: str | None = None,
-        ax=None,
-        figsize: tuple[float, float] | None = (14, 4),
-        label= None,
-) -> tuple[Figure, Axes]:
+        title: str = None,
+        xname: str = None,
+        yname: str = None,
+):
+    df = df.copy()
+
     if xname is None:
         xname = x
+
     if yname is None:
         yname = y
 
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure
+    fig, ax = plt.subplots(figsize=(16, 5))
 
-    ax.plot(df[x], df[y], label = label)
-    ax.set_title(title)
+    ax.plot(df[x], df[y])
+
+    ax.set_title(title, fontsize=14)
     ax.set_xlabel(xname)
     ax.set_ylabel(yname)
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    plt.close(fig)
+
+    return fig, ax
+
+def add_intermarket_spread_scatter(
+        df: pd.DataFrame,
+        title: str = None,
+        visibility_lines: bool = True,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.plot([-50, 400], [-50, 400], color='red', linestyle='--', linewidth=1, label='x=y')
+    if visibility_lines:
+        ax.plot([-50, 400], [-0, 450], color='gray', linestyle='--', linewidth=1, label='x=y')
+        ax.plot([0, 400], [-50, 350], color='gray', linestyle='--', linewidth=1, label='x=y')
+    ax.scatter(df['DAM_price'], df['IDM_price'], alpha=0.5)
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel("Cena DAM (€/MWh)")
+    ax.set_ylabel("Cena IDM (€/MWh)")
+    ax.set_xlim(-50, 400)
+    ax.set_ylim(-50, 400)
     ax.grid(True)
     plt.close(fig)
     return fig, ax
 
-def plot_dam_idm_line(df: pd.DataFrame) -> Figure:
-    fig, ax = plot_line(df, "deliveryStart", "DAM_price", "DAM price over 10.2025", "", "Price (€/MWh)",
-                            label="DAM15")
-    plot_line(df, "deliveryStart", "IDM_price", "IDM price over 10.2025", "", "Price (€/MWh)",
-                  ax=ax, label="DAM15")
-    ax.legend()
-    return fig
+def battery_output_dataframe(result):
+    rows = []
+
+    df = result["df"]
+    soc_path = result["soc_path"]
+    unit_size = result["unit_size"]
+
+    if "deliveryStart" in df.columns:
+        time_col = "deliveryStart"
+        time_label = "Začiatok dodávky"
+    else:
+        time_col = None
+        time_label = "Index"
+
+    for t, _, action in result["action_points"]:
+        if time_col is None:
+            time_value = t
+        else:
+            time_value = df.loc[t, time_col]
+        rows.append({
+            time_label: time_value,
+            "Cena (€/MWh)": df.loc[t, "price"],
+            "Akcia": action,
+            "Stav (jednotky)": soc_path[t + 1],
+            "Stav nabitia (MWh)": soc_path[t + 1] * unit_size
+        })
+
+    return pd.DataFrame(rows)
 
 
-def plot_box(
-        df: pd.DataFrame,
-        x: str,
-        y: str,
-        title: str | None = None,
-        xname: str | None = None,
-        yname: str | None = None,
-        figsize: tuple[float, float] | None = (6, 6),
-        limits: tuple[float, float] | None = (-100, 100),
-):
-    if xname is None:
-        xname = x
-    if yname is None:
-        yname = y
+def plot_weekday_bar(df: pd.DataFrame, title:str, ylabel:str):
 
-    fig, ax = plt.subplots(figsize=figsize)
+    days = ['Po', 'Ut', 'St', 'Št', 'Pi', 'So', 'Ne']
 
-    sns.boxplot(data=df, x=x, y=y, ax=ax)
-    ax.set_title(title)
-    ax.set_xlabel(xname)
-    ax.set_ylabel(yname)
-    ax.set_ylim(limits)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    colors = ['blue', 'blue', 'blue', 'blue', 'blue', 'orange', 'orange']
+    ax.bar([days[i] for i in df.index], df.values, color=colors)
+
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel('Deň v týždni')
+    ax.set_ylabel(ylabel)
+
     plt.close(fig)
+    return fig, ax
+
+def plot_hourly_line(df, title:str):
+    df = df.copy()
+
+    hourly = df.groupby('hour')['price'].mean()
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    plt.plot(hourly.index, hourly.values)
+
+    ax.set_xlabel('Hodina')
+    ax.set_ylabel('Priemerná cena (€/MWh)')
+    ax.set_title(title,fontsize=14)
+    ax.set_xticks(range(0, 24))
+    ax.grid(True)
+
+    plt.close(fig)
+
+
+def plot_intraday_period(df, MTU, title):
+    if MTU == 60:
+        periodCount = 24
+        hourlyJump = 1
+    else:
+        periodCount = 96
+        hourlyJump = 4
+
+    y = df.groupby("period")["price"].mean()
+    y = y.reindex(range(1, periodCount + 1))
+
+    fig, ax = plt.subplots(figsize=(16, 5))
+
+    ax.plot(y.index, y.values, marker="o")
+
+    for i in range(1, periodCount + 1, hourlyJump):
+        ax.axvline(x=i, linestyle="--", alpha=0.3)
+
+    tick_positions = range(1, periodCount + 1, hourlyJump)
+    tick_labels = range(1, periodCount + 1, hourlyJump)
+
+    ax.set_xlabel(f"perióda (1–{periodCount})")
+    ax.set_ylabel("Priemerná cena (€/MWh)")
+    ax.set_xticks(list(tick_positions))
+    ax.set_xticklabels(list(tick_labels))
+    ax.set_title(title, fontsize=14)
+
+    fig.tight_layout()
     return fig
 
-def plot_dam_idm_spread_box(
-        df: pd.DataFrame
-):
-    fig = plot_box(
-        df,
-        x='hour',
-        y='dam_idm_spread',
-        title="Deviation per hour of day October 2025",
-        xname='Hour of Day (Europe/Bratislava)',
-        yname='deviation (€/MWh)',
-        figsize=(10, 8),
-    )
-    return fig
+def plot_quarter_boxplots(df, column: str,ylabel: str, title:str ="Boxplot", ylimits=None):
+    df = df.copy()
 
-def plot_violin_quarterly_price(
-        df: pd.DataFrame,
-):
-    fig, axes = plt.subplots(6, 4, figsize=(18, 24))
+    quarter_order = [0, 1, 2, 3]
+
+    fig, axes = plt.subplots(6, 4, figsize=(16, 24), sharey=True)
     axes = axes.flatten()
 
-    for i, hour in enumerate(range(24)):
-        ax = axes[i]
+    for h in range(24):
+        ax = axes[h]
 
-        subset = df[df['hour'] == hour]
-        sns.violinplot(
-            data=subset,
+        df_h = df[df['hour'] == h]
+
+        sns.boxplot(
+            data=df_h,
             x='quarterHour',
-            y='price',
-            hue='market',
-            split=True,
-            inner='quartile',
-            cut=1,
-            density_norm='width',
+            y=column,
+            order=quarter_order,
             ax=ax
         )
-        ax.set_title(f'Hour {hour:02d}')
+
         ax.set_xticks([0, 1, 2, 3])
-        ax.set_xticklabels(['00–15', '15–30', '30–45', '45–60'])
+        ax.set_xticklabels([
+            f"{h:02d}:00",
+            f"{h:02d}:15",
+            f"{h:02d}:30",
+            f"{h:02d}:45"
+        ])
+
+        ax.axhline(0, color='black', linestyle='--', linewidth=1)
+
+        if ylimits is not None:
+            ax.set_ylim(ylimits[0], ylimits[1])
+
+        ax.set_title(f'Hodina {h:02d}')
         ax.set_xlabel('')
-        ax.set_ylim(-50, 400)
+        ax.set_ylabel(ylabel if h % 4 == 0 else '')
 
+    for i in range(24, len(axes)):
+        fig.delaxes(axes[i])
 
-        if i % 4 == 0:
-            ax.set_ylabel('Price (€/MWh)')
-        ax.grid(True)
-    plt.close(fig)
-    return fig
+    fig.suptitle(title,fontsize=14)
 
-def plot_ridge_hourly(
-        df: pd.DataFrame,
-        value_col: str,
-        title: str | None = None,
-        xname: str | None = None,
-) -> Figure:
+    fig.tight_layout(rect=[0, 0, 1, 0.99])
+    return fig, ax
 
-    if xname is None:
-        xname = value_col
+def plot_hour_boxplot(df, column, title: str, ylabel: str, ylimits=None):
+    fig, ax = plt.subplots(figsize=(16, 5))
+    sns.boxplot(data=df, x='hour', y=column, ax=ax)
+    ax.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.7)
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel('Hour of Day (Europe/Bratislava)')
+    ax.set_ylabel(ylabel)
 
-    hours = sorted(df['hour'].unique())
+    if ylimits is not None:
+        ax.set_ylim(ylimits[0], ylimits[1])
 
-    samples = [
-        df.loc[df['hour'] == h, value_col].dropna().values
-        for h in hours
-    ]
+    return fig, ax
 
-    labels = [f"{h:02d}:00" for h in hours]
-
-    fig = ridgeplot(
-        samples=samples,
-        labels=labels,
-        bandwidth=3,
-        colorscale="viridis",
-        colormode="row-index",
-        opacity=0.6,
-    )
-
-    fig.update_layout(
-        title=title,
-        height=1000,
-        width=1200,
-        font_size=14,
-        yaxis_title="Hour",
-        xaxis_title=xname,
-        showlegend=False )
-    return fig
-
-#    df["qh"] = (df["deliveryStartBA"].dt.hour * 4 + df["deliveryStartBA"].dt.minute // 15)
-
-#generic + domain
-
-def plot_hist(
-        df: pd.DataFrame,
-        x: str,
-        y: str,
-        title: str | None = None,
-        xname: str | None = None,
-        yname: str | None = None,
-        figsize: tuple[float, float] | None = (3, 5),
-
-):
-    if xname is None:
-        xname = x
-    if yname is None:
-        yname = y
-
-    fig, ax = plt.subplots( figsize=figsize)
-
-    #not like this
-    qh_mean = df.groupby(x, as_index=True)[y].mean()
-
-
-    ax.bar(qh_mean.index, qh_mean.values)
-    ax.set_xticks(ticks=list(range(0, 96, 4)),)
-    ax.set_title(title)
-    ax.set_xlabel(xname)
-    ax.set_ylabel(yname)
-    plt.close(fig)
-    return fig
-
-def plot_battery_dp_result(result):
+def plot_battery_dp_result(result, MTU, title:str):
     df = result["df"]
     soc_path = result["soc_path"]
     action_points = result["action_points"]
@@ -249,7 +217,7 @@ def plot_battery_dp_result(result):
 
     ax1.plot(
         prices,
-        color="royalblue",
+        color="blue",
         label="Cena elektriny (€/MWh)",
         linewidth=2,
         alpha=0.7
@@ -257,20 +225,19 @@ def plot_battery_dp_result(result):
 
     for t, price, action_type in action_points:
         if action_type == "charge":
-            ax1.scatter(t, price, color="green", marker="^", s=120, zorder=5)
+            ax1.scatter(t, price, color="green", marker="^", s=100)
         else:
-            ax1.scatter(t, price, color="red", marker="v", s=120, zorder=5)
+            ax1.scatter(t, price, color="red", marker="v", s=100)
 
     ax1.scatter([], [], color="green", marker="^", s=120, label="Nákup (Charge)")
     ax1.scatter([], [], color="red", marker="v", s=120, label="Predaj (Discharge)")
 
-    ax1.set_xlabel("Perióda (15-min intervaly)")
+    ax1.set_xlabel(f"Perióda ({MTU}-min intervaly)")
     ax1.set_ylabel("Cena (€/MWh)")
     ax1.grid(True, alpha=0.3)
 
     ax2 = ax1.twinx()
-    ax2.step(
-        range(len(soc_path)),
+    ax2.step(range(len(soc_path)),
         np.array(soc_path) * unit_size,
         where="post",
         color="orange",
@@ -287,23 +254,6 @@ def plot_battery_dp_result(result):
     for i in range(0, len(prices) + 1, 4):
         ax1.axvline(x=i, linestyle="--", color="gray", alpha=0.2)
 
-    plt.title(f"DP Analýza: (Zisk: {profit:.2f} €)")
+    plt.title(f"{title} (Zisk: {profit:.2f} €)", fontsize=14)
+    plt.close(fig)
     return fig
-
-def battery_output_dataframe(result):
-    rows = []
-
-    df = result["df"]
-    soc_path = result["soc_path"]
-    unit_size = result["unit_size"]
-
-    for t, _, action in result["action_points"]:
-        rows.append({
-            "deliveryStart": df.loc[t, "deliveryStart"],
-            "price": df.loc[t, "price"],
-            "action": action,
-            "soc_units": soc_path[t + 1],  # aligned with your previous logic
-            "soc_mwh": soc_path[t + 1] * unit_size
-        })
-
-    return pd.DataFrame(rows)
