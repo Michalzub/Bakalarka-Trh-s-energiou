@@ -127,7 +127,7 @@ def render_comparison(df: pd.DataFrame, dataset_mtu: int, title: str):
         col1, col2 = st.columns(2)
 
         with col1:
-            st.metric("Korelačný koeficient", f"{corr:.4f}")
+            st.metric("Korelačný koeficient cien", f"{corr:.4f}")
 
         with col2:
             st.metric("Počet spoločných periód", len(df))
@@ -137,7 +137,7 @@ def render_comparison(df: pd.DataFrame, dataset_mtu: int, title: str):
 
     tab1, tab2, tab3 = st.tabs([
         "Scatterplot",
-        "Boxplot rozdielov",
+        "Boxplot spreadu",
         "Dáta"
     ])
 
@@ -159,14 +159,14 @@ def render_comparison(df: pd.DataFrame, dataset_mtu: int, title: str):
                 fig, ax = viz.plot_hour_boxplot(
                     df=df,
                     column="spread",
-                    title=f"Boxplot rozdielov DAM - IDM podľa hodiny {title}",
+                    title=f"Rozdelenia spreadu DAM - IDM podľa hodiny {title}",
                     ylabel="Spread DAM - IDM (€/MWh)"
                 )
             else:
                 fig, ax = viz.plot_quarter_boxplots(
                     df=df,
                     column="spread",
-                    title=f"Boxplot rozdielov DAM - IDM podľa štvrťhodiny {title}",
+                    title=f"Rozdelenia spreadu DAM - IDM podľa štvrťhodiny {title}",
                     ylabel="Spread DAM - IDM (€/MWh)"
                 )
 

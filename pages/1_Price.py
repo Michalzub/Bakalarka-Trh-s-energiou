@@ -316,7 +316,7 @@ with center:
                             fig, ax = viz.plot_hour_boxplot(
                                 df=df,
                                 column="price",
-                                title="Boxplot cien podľa hodiny",
+                                title="Rozdelenia ceny podľa hodiny dňa",
                                 ylabel="Cena (€/MWh)"
                             )
                         else:
@@ -324,7 +324,7 @@ with center:
                                 df=df,
                                 column="price",
                                 ylabel="Cena (€/MWh)",
-                                title=f"Box plot cien za štvrť hodinu dňa {key}"
+                                title=f"Rozdelenia ceny podľa štvrťhodiny dňa {key}"
                             )
 
                         st.pyplot(fig)
@@ -357,7 +357,7 @@ with center:
                             fig, ax = viz.plot_hour_boxplot(
                                 df=df,
                                 column="price_diff",
-                                title=f"Boxplot medziperiodných rozdielov podľa hodiny {key}",
+                                title=f"Rozdelenia Medziperiódnych rozdielov ceny podľa hodiny {key}",
                                 ylabel="Zmena ceny (€/MWh)"
                             )
                         else:
@@ -365,7 +365,7 @@ with center:
                                 df=df,
                                 column="price_diff",
                                 ylabel="Zmena ceny (€/MWh)",
-                                title=f"Boxplot medziperiodných rozdielov podľa štvrť hodiny {key}",
+                                title=f"Rozdelenia Medziperiódnych rozdielov ceny podľa štvrťhodiny {key}",
                             )
 
                         st.pyplot(fig)

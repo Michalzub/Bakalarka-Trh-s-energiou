@@ -150,7 +150,7 @@ def plot_quarter_boxplots(df, column: str,ylabel: str, title:str ="Boxplot", yli
 
     quarter_order = [0, 1, 2, 3]
 
-    fig, axes = plt.subplots(6, 4, figsize=(16, 24), sharey=True)
+    fig, axes = plt.subplots(6, 4, figsize=(18, 24), sharey=True)
     axes = axes.flatten()
 
     for h in range(24):
@@ -168,25 +168,30 @@ def plot_quarter_boxplots(df, column: str,ylabel: str, title:str ="Boxplot", yli
 
         ax.set_xticks([0, 1, 2, 3])
         ax.set_xticklabels([
-            f"{h:02d}:00",
-            f"{h:02d}:15",
-            f"{h:02d}:30",
-            f"{h:02d}:45"
-        ])
+                f"{h:02d}:00",
+                f"{h:02d}:15",
+                f"{h:02d}:30",
+                f"{h:02d}:45"
+            ],
+            fontsize=14
+        )
+
+        ax.tick_params(axis='y', labelsize=14)
+        ax.tick_params(axis='x', labelsize=14)
 
         ax.axhline(0, color='black', linestyle='--', linewidth=1)
 
         if ylimits is not None:
             ax.set_ylim(ylimits[0], ylimits[1])
 
-        ax.set_title(f'Hodina {h:02d}')
+        ax.set_title(f'Hodina {h:02d}', fontsize=18)
         ax.set_xlabel('')
-        ax.set_ylabel(ylabel if h % 4 == 0 else '')
+        ax.set_ylabel(ylabel if h % 4 == 0 else '', fontsize=16)
 
     for i in range(24, len(axes)):
         fig.delaxes(axes[i])
 
-    fig.suptitle(title,fontsize=14)
+    fig.suptitle(title,fontsize=24)
 
     fig.tight_layout(rect=[0, 0, 1, 0.99])
     return fig, ax

@@ -157,7 +157,7 @@ with center:
             value=50.0,
             step=10.0,
             format="%.2f",
-            help="Náklady za distribúciu za každé nabitie/vybitie.",
+            help="Náklady za distribúciu za každé nabitie.",
         )
 
     load_clicked = st.button("Načítať dataset")
