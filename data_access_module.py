@@ -49,13 +49,13 @@ def cache_path(source:str, year:int, month:int, unique_identifier: str = ""):
         return Path("cache") / source / f"{year}-{month:02d}.parquet"
 
 
-def months_between(startDate: datetime, endDate: datetime):
+def months_between(start_date: datetime, end_date: datetime):
     months= []
 
-    year = startDate.year
-    month = startDate.month
+    year = start_date.year
+    month = start_date.month
 
-    while(year, month) <= (endDate.year, endDate.month):
+    while(year, month) <= (end_date.year, end_date.month):
         months.append(date(year, month, 1))
         month += 1
         if month > 12:
@@ -64,29 +64,29 @@ def months_between(startDate: datetime, endDate: datetime):
 
     return months
 
-def check_valid_date_range(startDate: datetime, endDate: datetime):
-    if startDate > endDate:
+def check_valid_date_range(start_date: datetime, end_date: datetime):
+    if start_date > end_date:
         raise ValueError("startDate must be before endDate")
 
-    if (endDate - startDate).days > 365:
+    if (end_date - start_date).days > 365:
         raise ValueError("Date range cannot be longer than one year")
 
-def build_okte_url(marketType:str, startDate: datetime, endDate: datetime):
-    last_day = calendar.monthrange(endDate.year, endDate.month)[1]
+def build_okte_url(market_type:str, start_date: datetime, end_date: datetime):
+    last_day = calendar.monthrange(end_date.year, end_date.month)[1]
 
-    start = f"{startDate.year}-{startDate.month:02d}-{startDate.day:02d}"
-    end = f"{endDate.year}-{endDate.month:02d}-{last_day:02d}"
-    return MARKET_URLS[marketType].format(start=start, end=end)
+    start = f"{start_date.year}-{start_date.month:02d}-{start_date.day:02d}"
+    end = f"{end_date.year}-{end_date.month:02d}-{last_day:02d}"
+    return MARKET_URLS[market_type].format(start=start, end=end)
 
-def get_okte_data_simple(marketType: str, startDate: datetime, endDate: datetime):
+def get_okte_data_simple(market_type: str, start_date: datetime, end_date: datetime):
 
-    check_valid_date_range(startDate, endDate)
+    check_valid_date_range(start_date, end_date)
 
-    if marketType not in MARKET_URLS:
+    if market_type not in MARKET_URLS:
         raise ValueError("marketType doesnt exist")
 
 
-    months = months_between(startDate, endDate)
+    months = months_between(start_date, end_date)
 
     frames = []
 
@@ -96,27 +96,27 @@ def get_okte_data_simple(marketType: str, startDate: datetime, endDate: datetime
 
     for month in months:
         is_current_month = (month.year == current_year and month.month == current_month)
-        dp = cache_path("OKTE", month.year, month.month, marketType)
+        dp = cache_path("OKTE", month.year, month.month, market_type)
         if not dp.is_file() or is_current_month:
-            url = build_okte_url(marketType, month, month)
+            url = build_okte_url(market_type, month, month)
             json_data = fetch_data(url)
             df = pd.DataFrame(json_data)
             save_data(df, dp)
         else:
             df = load_data(dp)
 
-        df['market'] = marketType
+        df['market'] = market_type
         frames.append(df)
 
     final = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     if not final.empty:
         convert_to_datetime(final, ["deliveryStart"])
-        startDate = pd.Timestamp(startDate).tz_localize("Europe/Bratislava")
-        endDate = pd.Timestamp(endDate).replace(hour=23, minute=45, second=00).tz_localize("Europe/Bratislava")
+        start_date = pd.Timestamp(start_date).tz_localize("Europe/Bratislava")
+        end_date = pd.Timestamp(end_date).replace(hour=23, minute=45, second=00).tz_localize("Europe/Bratislava")
         final = final[
-            (final["deliveryStart"] >= startDate) &
-            (final["deliveryStart"] <= endDate)
+            (final["deliveryStart"] >= start_date) &
+            (final["deliveryStart"] <= end_date)
             ]
         final = final.rename(columns={"priceWeightedAverage": "price"})
         return final
