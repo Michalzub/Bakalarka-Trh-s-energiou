@@ -119,7 +119,7 @@ with center:
 
     with b1:
         max_soc_units = st.number_input(
-            "Max SOC units",
+            "Maximum jednotiek SOC",
             min_value=1,
             max_value=100,
             value=2,
@@ -128,14 +128,14 @@ with center:
         )
 
     with b2:
-        unit_size = st.number_input(
-            "Veľkosť jednotky (MWh)",
+        power = st.number_input(
+            "Výkon batérie (MW)",
             min_value=0.01,
             max_value=10.0,
             value=0.5,
             step=0.25,
             format="%.2f",
-            help="Kapacita jednej jednotky batérie.",
+            help="Hodnota reaguje na zmeny v MTU",
         )
 
     with b3:
@@ -189,9 +189,10 @@ with center:
             result = am.calculate_battery_arbitrage(
                 df=df,
                 max_soc_units=max_soc_units,
-                unit_size=unit_size,
+                power=power,
                 efficiency=efficiency,
                 distribution_cost=distribution_cost,
+                mtu=mtu
             )
 
             st.success("Dataset načítaný a optimálna stratégia vypočítaná.")

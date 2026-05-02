@@ -244,7 +244,7 @@ def plot_battery_dp_result(result, MTU, title:str):
     ax2 = ax1.twinx()
     ax2.step(range(len(soc_path)),
         np.array(soc_path) * unit_size,
-        where="post",
+        where="pre",
         color="orange",
         alpha=0.5,
         label="SoC (MWh)"

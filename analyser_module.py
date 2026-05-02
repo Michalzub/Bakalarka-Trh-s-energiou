@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import skew, kurtosis
 
+
 def calculate_corr(df: pd.DataFrame, col1: str, df2: pd.DataFrame, col2: str):
     s1 = df[col1]
     s2 = df2[col2]
@@ -85,13 +86,17 @@ def avg_daily_max_spread_by_weekday(df: pd.DataFrame):
 def calculate_battery_arbitrage(
         df: pd.DataFrame,
         max_soc_units:int = 2,
-        unit_size:float = 0.5,
+        power:float = 0.5,
         efficiency:float = 0.90,
-        distribution_cost:float = 0.00
+        distribution_cost:float = 50.00,
+        mtu:int = 60
+
 ):
     df = df.reset_index(drop=True).copy()
     prices = df['price']
     periods = len(df['price'])
+
+    unit_size = power * 0.25 if mtu == 15 else power
 
     profits = np.full((periods + 1, max_soc_units + 1), -np.inf)
     parent = np.full((periods + 1, max_soc_units + 1), -1, dtype=int)
